@@ -16,9 +16,28 @@ __all__ = [
     'deit_base_distilled_patch16_384',
 ]
 
+def exists(val):
+    return val is not None
+
+def default(val ,d):
+    return val if exists(val) else d
+
+class PatchMerger(nn.Module):
+    def __init__(self, dim, num_tokens_out):
+        super().__init__()
+        self.scale = dim ** -0.5
+        self.norm = nn.LayerNorm(dim)
+        self.queries = nn.Parameter(torch.randn(num_tokens_out, dim))
+
+    def forward(self, x):
+        x = self.norm(x)
+        sim = torch.matmul(self.queries, x.transpose(-1, -2)) * self.scale
+        attn = sim.softmax(dim = -1)
+        return torch.matmul(attn, x)
+
 
 class DistilledVisionTransformer(VisionTransformer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, patch_merge_layer, patch_merge_num_tokens, embed_dim, depth, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dist_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
         num_patches = self.patch_embed.num_patches
@@ -28,6 +47,11 @@ class DistilledVisionTransformer(VisionTransformer):
         trunc_normal_(self.dist_token, std=.02)  # dist token weight initialization
         trunc_normal_(self.pos_embed, std=.02)  # pos embedding weight initialization
         self.head_dist.apply(self._init_weights)  # linear weight trunc_normal_로 initialization & bias 0 initialization
+
+        # patchmerger
+        self.patch_merge_layer_index = default(patch_merge_layer, depth // 2) - 1
+        self.patch_merger = PatchMerger(dim=embed_dim, num_tokens_out=patch_merge_num_tokens)
+
 
     def forward_features(self, x):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
@@ -42,8 +66,12 @@ class DistilledVisionTransformer(VisionTransformer):
         x = x + self.pos_embed
         x = self.pos_drop(x)
 
-        for blk in self.blocks:
+        for index, blk in enumerate(self.blocks):
             x = blk(x)
+
+            # forward patchmerger
+            if index == self.patch_merge_layer_index:
+                x = self.patch_merger(x)
 
         x = self.norm(x)
         return x[:, 0], x[:, 1]
