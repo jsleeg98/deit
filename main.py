@@ -268,7 +268,7 @@ def main(args):
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
         img_size=args.input_size,
-        patch_merge_layer_index=6,
+        patch_merge_layer=6,
         patch_merge_num_tokens=8
     )
 
