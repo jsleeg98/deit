@@ -113,8 +113,8 @@ def create_model(
     with set_layer_config(scriptable=scriptable, exportable=exportable, no_jit=no_jit):
         model = create_fn(
             pretrained=pretrained,
-            pretrained_cfg=pretrained_cfg,
-            pretrained_cfg_overlay=pretrained_cfg_overlay,
+            # pretrained_cfg=pretrained_cfg,
+            # pretrained_cfg_overlay=pretrained_cfg_overlay,
             **kwargs,
         )
 
