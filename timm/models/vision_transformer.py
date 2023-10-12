@@ -49,6 +49,25 @@ __all__ = ['VisionTransformer']  # model_registry will add each entrypoint fn to
 _logger = logging.getLogger(__name__)
 
 
+def exists(val):
+    return val is not None
+
+def default(val ,d):
+    return val if exists(val) else d
+
+class PatchMerger(nn.Module):
+    def __init__(self, dim, num_tokens_out):
+        super().__init__()
+        self.scale = dim ** -0.5
+        self.norm = nn.LayerNorm(dim)
+        self.queries = nn.Parameter(torch.randn(num_tokens_out, dim))
+
+    def forward(self, x):
+        x = self.norm(x)
+        sim = torch.matmul(self.queries, x.transpose(-1, -2)) * self.scale
+        attn = sim.softmax(dim = -1)
+        return torch.matmul(attn, x)
+
 class Attention(nn.Module):
     fused_attn: Final[bool]
 
@@ -417,6 +436,8 @@ class VisionTransformer(nn.Module):
             act_layer: Optional[Callable] = None,
             block_fn: Callable = Block,
             mlp_layer: Callable = Mlp,
+            patch_merge_layer=None,
+            patch_merge_num_tokens=8,
     ):
         """
         Args:
@@ -504,6 +525,10 @@ class VisionTransformer(nn.Module):
             )
             for i in range(depth)])
         self.norm = norm_layer(embed_dim) if not use_fc_norm else nn.Identity()
+
+        # patchmerger
+        self.patch_merge_layer_index = default(patch_merge_layer, depth // 2) - 1
+        self.patch_merger = PatchMerger(dim=embed_dim, num_tokens_out=patch_merge_num_tokens)
 
         # Classifier Head
         self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
@@ -597,6 +622,10 @@ class VisionTransformer(nn.Module):
             x = blk(x)
             if i in take_indices:
                 outputs.append(x)
+
+            # forward patchmerger
+            if i == self.patch_merge_layer_index:
+                x = self.patch_merger(x)
 
         return outputs
 
