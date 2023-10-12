@@ -25,9 +25,9 @@ class DistilledVisionTransformer(VisionTransformer):
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 2, self.embed_dim))
         self.head_dist = nn.Linear(self.embed_dim, self.num_classes) if self.num_classes > 0 else nn.Identity()
 
-        trunc_normal_(self.dist_token, std=.02)
-        trunc_normal_(self.pos_embed, std=.02)
-        self.head_dist.apply(self._init_weights)
+        trunc_normal_(self.dist_token, std=.02)  # dist token weight initialization
+        trunc_normal_(self.pos_embed, std=.02)  # pos embedding weight initialization
+        self.head_dist.apply(self._init_weights)  # linear weight trunc_normal_로 initialization & bias 0 initialization
 
     def forward_features(self, x):
         # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
