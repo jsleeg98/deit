@@ -417,8 +417,7 @@ class VisionTransformer(nn.Module):
             act_layer: Optional[Callable] = None,
             block_fn: Callable = Block,
             mlp_layer: Callable = Mlp,
-            patch_merge_layer=None,
-            patch_merge_num_tokens=8,
+            **kwargs
     ):
         """
         Args:
