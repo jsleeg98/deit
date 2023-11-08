@@ -94,6 +94,7 @@ class Attention(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
+        self.dim = dim
 
     def forward(self, x):
         B, N, C = x.shape
@@ -117,6 +118,25 @@ class Attention(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
+
+    def flops(self, N):
+        # calculate flops with token length of N
+        flops = 0
+        # qkv = self.qkv(x)
+        flops += N * self.dim * 3 * self.dim
+        if not isinstance(self.q_norm, nn.Identity):
+            # self.q_norm(q)
+            flops += N * self.dim
+        if not isinstance(self.k_norm, nn.Identity):
+            # self.k_norm(q)
+            flops += N * self.dim
+        # attn = q @ k.transpose(-2, -1)
+        flops += self.num_heads * N * (self.dim // self.num_heads) * N
+        # x = attn @ v
+        flops += self.num_heads * N * N * (self.dim // self.num_heads)
+        # x = self.proj(x)
+        flops += N * self.dim * self.dim
+        return flops
 
 
 class LayerScale(nn.Module):
