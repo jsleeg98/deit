@@ -189,11 +189,31 @@ class Block(nn.Module):
         )
         self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.dim = dim  # dim
 
     def forward(self, x):
         x = x + self.drop_path1(self.ls1(self.attn(self.norm1(x))))
         x = x + self.drop_path2(self.ls2(self.mlp(self.norm2(x))))
         return x
+
+    def flops(self, N):
+        flops = 0
+        # norm1
+        flops += N * self.dim
+        # attn
+        flops += self.attn.flops(N)
+        if not isinstance(self.ls1, nn.Identity):
+            # ls1
+            flops += N * self.dim
+        # norm2
+        flops += N * self.dim
+        # mlp
+        flops += self.mlp.flops(N)
+        if not isinstance(self.ls2, nn.Identity):
+            # ls2
+            flops += N * self.dim
+
+        return flops
 
 
 class ResPostBlock(nn.Module):
