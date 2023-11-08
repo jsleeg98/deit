@@ -37,6 +37,9 @@ class Mlp(nn.Module):
         self.norm = norm_layer(hidden_features) if norm_layer is not None else nn.Identity()
         self.fc2 = linear_layer(hidden_features, out_features, bias=bias[1])
         self.drop2 = nn.Dropout(drop_probs[1])
+        self.in_features = in_features
+        self.hidden_features = hidden_features
+        self.out_features = out_features
 
     def forward(self, x):
         x = self.fc1(x)
@@ -46,6 +49,18 @@ class Mlp(nn.Module):
         x = self.fc2(x)
         x = self.drop2(x)
         return x
+
+    def flops(self, N):
+        # calculate flops with token length of N
+        flops = 0
+        # x = self.fc1(x)
+        flops += N * self.in_features * self.hidden_features
+        if not isinstance(self.norm, nn.Identity):
+            # x = self.norm(x)
+            flops += N * self.hidden_features
+        # x = self.fc2(x)
+        flops += N * self.hidden_features * self.out_features
+        return flops
 
 
 class GluMlp(nn.Module):
