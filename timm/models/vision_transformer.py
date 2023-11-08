@@ -846,6 +846,7 @@ class VisionTransformer(nn.Module):
             **embed_args,
         )
         num_patches = self.patch_embed.num_patches
+        self.num_patches = num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) if class_token else None
         embed_len = num_patches if no_embed_class else num_patches + self.num_prefix_tokens
@@ -1031,6 +1032,27 @@ class VisionTransformer(nn.Module):
         x = self.forward_head(x)
         return x
 
+    def flops(self):
+        flops = 0
+        # x = self.patch_embed(x)
+        flops += self.patch_embed.flops()
+        if not isinstance(self.norm_pre, nn.Identity):
+            # x = self.norm_pre(x)
+            flops += self.num_patches * self.embed_dim
+        num_patches = self.num_patches
+        for i, blk in enumerate(self.blocks):
+            flops += blk.flops(num_patches)
+        if not isinstance(self.norm, nn.Identity):
+            # x = self.norm(x)
+            flops += num_patches * self.embed_dim
+        if self.global_pool:
+            flops += num_patches * self.embed_dim
+        if not isinstance(self.fc_norm, nn.Identity):
+            # x = self.fc_norm(x)
+            flops += num_patches * self.embed_dim
+        # self.head(x)
+        flops += num_patches * self.embed_dim * self.num_classes
+        return flops
 
 def init_weights_vit_timm(module: nn.Module, name: str = ''):
     """ ViT weight initialization, original timm impl (for reproducibility) """
