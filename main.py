@@ -272,6 +272,18 @@ def main(args):
         patch_merge_num_tokens=8
     )
 
+    # input = torch.ones(10, 3, 224, 224)
+    # import pdb; pdb.set_trace()
+    # model(input)
+
+    # import pdb; pdb.set_trace()
+    print(f'custom flops : {model.flops()}')
+
+    from torchprofile import profile_macs
+    inputs = torch.randn(1, 3, 224, 224)
+    macs = profile_macs(model, inputs)
+    print(f'torchprofile : {macs}')
+
                     
     if args.finetune:
         if args.finetune.startswith('https'):
@@ -344,7 +356,7 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
@@ -415,7 +427,11 @@ def main(args):
         test_stats = evaluate(data_loader_val, model, device)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         return
-
+    # check param requires_grad
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad == True:
+    #         print(name)
+    # import pdb; pdb.set_trace()
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     max_accuracy = 0.0
