@@ -61,12 +61,24 @@ class PatchMerger(nn.Module):
         self.scale = dim ** -0.5
         self.norm = nn.LayerNorm(dim)
         self.queries = nn.Parameter(torch.randn(num_tokens_out, dim))
+        self.dim = dim
+        self.num_tokens_out = num_tokens_out
 
     def forward(self, x):
         x = self.norm(x)
         sim = torch.matmul(self.queries, x.transpose(-1, -2)) * self.scale
         attn = sim.softmax(dim = -1)
         return torch.matmul(attn, x)
+
+    def flops(self, N):
+        flops = 0
+        # x = self.norm(x)
+        flops += N * self.dim
+        # sim
+        flops += self.num_tokens_out * self.dim * N
+        # attn, x
+        flops += N * self.dim * self.num_tokens_out
+        return flops
 
 class Attention(nn.Module):
     fused_attn: Final[bool]
@@ -734,10 +746,11 @@ class VisionTransformer_PatchMerger(nn.Module):
             # x = self.norm_pre(x)
             flops += self.num_patches * self.embed_dim
         num_patches = self.num_patches
+        flops += self.patch_merger.flops(num_patches)
         for i, blk in enumerate(self.blocks):
+            flops += blk.flops(num_patches)
             if i == self.patch_merge_layer_index:
                 num_patches = self.patch_merge_num_tokens
-            flops += blk.flops(num_patches)
         if not isinstance(self.norm, nn.Identity):
             # x = self.norm(x)
             flops += num_patches * self.embed_dim
